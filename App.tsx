@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Mic, MicOff, AlertCircle, Zap, Layout, Github } from 'lucide-react';
-import { useLiveApi } from './hooks/use-live-api';
-import AudioVisualizer from './components/AudioVisualizer';
-import SettingsPanel from './components/SettingsPanel';
-import { LiveConfig, ConnectionState } from './types';
+import { useLiveApi } from './hooks/use-live-api.ts';
+import AudioVisualizer from './components/AudioVisualizer.tsx';
+import SettingsPanel from './components/SettingsPanel.tsx';
+import { LiveConfig, ConnectionState } from './types.ts';
 
 const App: React.FC = () => {
   const [config, setConfig] = useState<LiveConfig>({

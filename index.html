@@ -34,6 +34,7 @@
       }
       .custom-scrollbar::-webkit-scrollbar {
         width: 6px;
+        height: 6px;
       }
       .custom-scrollbar::-webkit-scrollbar-track {
         background: rgba(15, 23, 42, 0.5);
@@ -54,13 +55,18 @@
         "react/": "https://aistudiocdn.com/react@^19.2.0/",
         "react": "https://aistudiocdn.com/react@^19.2.0",
         "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
         "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
         "pdfjs-dist": "https://esm.sh/pdfjs-dist@4.2.67"
       }
     }
     </script>
+    <!-- Babel Standalone for in-browser JSX/TSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
   <body>
     <div id="root"></div>
+    <!-- Entry Point: Compile index.tsx as a module -->
+    <script type="text/babel" data-type="module" data-presets="react,typescript" src="./index.tsx"></script>
   </body>
 </html>

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import { createAudioContentBlob, decodeAudioData, decodeBase64ToUint8Array } from '../utils/audio-utils';
-import { ConnectionState, LiveConfig, VolumeLevel } from '../types';
+import { createAudioContentBlob, decodeAudioData, decodeBase64ToUint8Array } from '../utils/audio-utils.ts';
+import { ConnectionState, LiveConfig, VolumeLevel } from '../types.ts';
 
 // Robustly get API Key from process.env or window.process.env
 const API_KEY = (process.env.API_KEY as string) || ((window as any).process?.env?.API_KEY as string) || '';

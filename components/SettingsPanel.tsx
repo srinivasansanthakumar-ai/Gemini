@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, Upload, Loader2, CheckCircle, File, Type } from 'lucide-react';
-import { LiveConfig } from '../types';
+import { LiveConfig } from '../types.ts';
 
 interface SettingsPanelProps {
   config: LiveConfig;

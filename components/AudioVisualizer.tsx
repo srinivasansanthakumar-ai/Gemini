@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { VolumeLevel } from '../types';
+import { VolumeLevel } from '../types.ts';
 
 interface AudioVisualizerProps {
   volume: VolumeLevel;
