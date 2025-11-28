@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, FileText, Upload, Info, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Settings, FileText, Upload, Info, Loader2, CheckCircle } from 'lucide-react';
 import { LiveConfig } from '../types';
-import * as pdfjsLib from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 
 // Initialize PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs`;
+GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs`;
 
 interface SettingsPanelProps {
   config: LiveConfig;
@@ -17,19 +17,23 @@ const VOICES = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsProcessing(true);
+    setFileName(file.name);
 
     try {
       if (file.type === 'application/pdf') {
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let fullText = '';
+        // Use the named export getDocument
+        const loadingTask = getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
         
+        let fullText = '';
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
@@ -41,7 +45,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
 
         setConfig(prev => ({
           ...prev,
-          systemInstruction: prev.systemInstruction + "\n\n=== PDF Knowledge Base (" + file.name + ") ===\n" + fullText
+          systemInstruction: prev.systemInstruction + `\n\n=== PDF Context: ${file.name} ===\n${fullText}`
         }));
 
       } else {
@@ -52,7 +56,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
           if (text) {
             setConfig(prev => ({
               ...prev,
-              systemInstruction: prev.systemInstruction + "\n\n=== Knowledge Base (" + file.name + ") ===\n" + text
+              systemInstruction: prev.systemInstruction + `\n\n=== File Context: ${file.name} ===\n${text}`
             }));
           }
         };
@@ -60,10 +64,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
       }
     } catch (error) {
       console.error("Error reading file:", error);
-      alert("Failed to read file. Please ensure it is a valid text or PDF file.");
+      alert("Failed to parse file. Please ensure it is a valid PDF or text file.");
+      setFileName(null);
     } finally {
       setIsProcessing(false);
-      // Reset input
+      // Reset input value to allow re-uploading the same file if needed
       e.target.value = '';
     }
   };
@@ -72,7 +77,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
     return (
       <button 
         onClick={() => setIsOpen(true)}
-        className="absolute top-6 right-6 p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full transition-all shadow-lg border border-slate-700"
+        className="absolute top-6 right-6 p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full transition-all shadow-lg border border-slate-700 z-50"
         title="Settings"
       >
         <Settings size={20} />
@@ -128,27 +133,37 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
           </div>
         </label>
         
-        <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 mb-4">
+        <div className={`rounded-xl p-4 border mb-4 transition-colors ${fileName ? 'bg-indigo-900/20 border-indigo-500/50' : 'bg-slate-800 border-slate-700'}`}>
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-indigo-500/10 rounded-lg">
-               <FileText size={20} className="text-indigo-400" />
+            <div className={`p-2 rounded-lg ${fileName ? 'bg-indigo-500 text-white' : 'bg-indigo-500/10 text-indigo-400'}`}>
+               <FileText size={20} />
             </div>
-            <div>
-              <h3 className="text-sm font-medium text-white">Drive Context / PDF</h3>
-              <p className="text-xs text-slate-400">Upload PDF or text to ground the model.</p>
+            <div className="overflow-hidden">
+              <h3 className="text-sm font-medium text-white truncate">
+                {fileName || "Drive / Local File"}
+              </h3>
+              <p className="text-xs text-slate-400 truncate">
+                {fileName ? "Context loaded successfully" : "Upload PDF to ground the AI"}
+              </p>
             </div>
+            {fileName && <CheckCircle size={16} className="text-emerald-400 ml-auto flex-shrink-0" />}
           </div>
+          
           <div className="relative">
              <input 
                type="file" 
                accept=".txt,.md,.json,.csv,.pdf"
                onChange={handleFileUpload}
                disabled={disabled || isProcessing}
-               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
              />
              <button 
                 disabled={disabled || isProcessing} 
-                className={`w-full py-2 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center gap-2 text-sm text-slate-400 hover:text-indigo-400 hover:border-indigo-400 transition-colors ${disabled || isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`w-full py-2 border-2 border-dashed rounded-lg flex items-center justify-center gap-2 text-sm transition-colors ${
+                  fileName 
+                    ? 'border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10' 
+                    : 'border-slate-600 text-slate-400 hover:text-indigo-400 hover:border-indigo-400'
+                } ${disabled || isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
              >
                {isProcessing ? (
                  <>
@@ -158,24 +173,29 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
                ) : (
                  <>
                    <Upload size={16} />
-                   <span>Load PDF or Text</span>
+                   <span>{fileName ? "Replace File" : "Upload PDF Document"}</span>
                  </>
                )}
              </button>
           </div>
         </div>
 
-        <textarea
-          value={config.systemInstruction}
-          onChange={(e) => setConfig({ ...config, systemInstruction: e.target.value })}
-          disabled={disabled}
-          placeholder="Enter system instructions or paste your knowledge base text here..."
-          className="w-full h-64 bg-slate-800 border border-slate-700 rounded-xl p-4 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none font-mono leading-relaxed"
-        />
+        <div className="relative">
+          <textarea
+            value={config.systemInstruction}
+            onChange={(e) => setConfig({ ...config, systemInstruction: e.target.value })}
+            disabled={disabled}
+            placeholder="System instructions..."
+            className="w-full h-48 bg-slate-800 border border-slate-700 rounded-xl p-4 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none font-mono leading-relaxed"
+          />
+          <div className="absolute bottom-2 right-2 text-xs text-slate-500 pointer-events-none">
+            {config.systemInstruction.length} chars
+          </div>
+        </div>
       </div>
 
       <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-xs text-yellow-200/80 leading-relaxed">
-        <strong>Note:</strong> Changes to configuration require a new session connection to take effect.
+        <strong>Note:</strong> Restart the conversation to apply new voice or knowledge base settings.
       </div>
     </div>
   );

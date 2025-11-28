@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mic, MicOff, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, AlertCircle, FileCheck } from 'lucide-react';
 import { useLiveApi } from './hooks/use-live-api';
 import AudioVisualizer from './components/AudioVisualizer';
 import SettingsPanel from './components/SettingsPanel';
@@ -12,6 +12,9 @@ const App: React.FC = () => {
   });
 
   const { connect, disconnect, connectionState, volume, error } = useLiveApi(config);
+  
+  // Detect if system instruction has been modified (simple check for knowledge base)
+  const hasContext = config.systemInstruction.length > 200; // Arbitrary threshold for default vs customized
 
   const toggleConnection = () => {
     if (connectionState === ConnectionState.CONNECTED) {
@@ -31,17 +34,27 @@ const App: React.FC = () => {
       <div className="w-full max-w-4xl bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl p-6 md:p-10 relative z-10 flex flex-col items-center">
         
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 relative">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-400 mb-4">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className={`w-2 h-2 rounded-full ${connectionState === ConnectionState.CONNECTED ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
             Gemini 2.5 Live API
           </div>
+          
           <h1 className="text-4xl md:text-5xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 mb-2">
             Conversational Voice
           </h1>
           <p className="text-slate-400 max-w-lg mx-auto">
             Experience real-time, low-latency voice interactions with grounded context from your documents.
           </p>
+          
+          {hasContext && (
+            <div className="absolute -right-4 top-0 hidden md:flex flex-col items-center animate-fade-in">
+                <div className="bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 shadow-sm">
+                   <FileCheck size={14} />
+                   <span>Knowledge Base Active</span>
+                </div>
+            </div>
+          )}
         </div>
 
         {/* Visualizer Container */}
@@ -52,7 +65,7 @@ const App: React.FC = () => {
         {/* Controls */}
         <div className="flex flex-col items-center gap-6 w-full max-w-md">
           {error && (
-            <div className="w-full p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-3 text-red-400 text-sm">
+            <div className="w-full p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-3 text-red-400 text-sm animate-shake">
               <AlertCircle size={16} />
               <span>{error}</span>
             </div>
@@ -94,6 +107,7 @@ const App: React.FC = () => {
                uppercase
                ${connectionState === ConnectionState.CONNECTED ? 'text-emerald-400' : ''}
                ${connectionState === ConnectionState.ERROR ? 'text-red-400' : ''}
+               ${connectionState === ConnectionState.DISCONNECTED ? 'text-slate-400' : ''}
              `}>
                {connectionState}
              </span>
