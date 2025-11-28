@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
-import { Settings, FileText, Upload, Info } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, FileText, Upload, Info, Loader2 } from 'lucide-react';
 import { LiveConfig } from '../types';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Initialize PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs`;
 
 interface SettingsPanelProps {
   config: LiveConfig;
@@ -12,22 +16,56 @@ const VOICES = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (text) {
+    setIsProcessing(true);
+
+    try {
+      if (file.type === 'application/pdf') {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ');
+          fullText += `\n--- PDF Page ${i} ---\n${pageText}`;
+        }
+
         setConfig(prev => ({
           ...prev,
-          systemInstruction: prev.systemInstruction + "\n\n=== Knowledge Base ===\n" + text
+          systemInstruction: prev.systemInstruction + "\n\n=== PDF Knowledge Base (" + file.name + ") ===\n" + fullText
         }));
+
+      } else {
+        // Fallback for text files
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const text = event.target?.result as string;
+          if (text) {
+            setConfig(prev => ({
+              ...prev,
+              systemInstruction: prev.systemInstruction + "\n\n=== Knowledge Base (" + file.name + ") ===\n" + text
+            }));
+          }
+        };
+        reader.readAsText(file);
       }
-    };
-    reader.readAsText(file);
+    } catch (error) {
+      console.error("Error reading file:", error);
+      alert("Failed to read file. Please ensure it is a valid text or PDF file.");
+    } finally {
+      setIsProcessing(false);
+      // Reset input
+      e.target.value = '';
+    }
   };
 
   if (!isOpen) {
@@ -97,20 +135,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
             </div>
             <div>
               <h3 className="text-sm font-medium text-white">Drive Context / PDF</h3>
-              <p className="text-xs text-slate-400">Upload text content to ground the model.</p>
+              <p className="text-xs text-slate-400">Upload PDF or text to ground the model.</p>
             </div>
           </div>
           <div className="relative">
              <input 
                type="file" 
-               accept=".txt,.md,.json,.csv"
+               accept=".txt,.md,.json,.csv,.pdf"
                onChange={handleFileUpload}
-               disabled={disabled}
+               disabled={disabled || isProcessing}
                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
              />
-             <button disabled={disabled} className={`w-full py-2 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center gap-2 text-sm text-slate-400 hover:text-indigo-400 hover:border-indigo-400 transition-colors ${disabled ? 'opacity-50' : ''}`}>
-               <Upload size={16} />
-               <span>Load Text File</span>
+             <button 
+                disabled={disabled || isProcessing} 
+                className={`w-full py-2 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center gap-2 text-sm text-slate-400 hover:text-indigo-400 hover:border-indigo-400 transition-colors ${disabled || isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+             >
+               {isProcessing ? (
+                 <>
+                   <Loader2 size={16} className="animate-spin" />
+                   <span>Processing...</span>
+                 </>
+               ) : (
+                 <>
+                   <Upload size={16} />
+                   <span>Load PDF or Text</span>
+                 </>
+               )}
              </button>
           </div>
         </div>
