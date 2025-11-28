@@ -1,0 +1,7 @@
+{
+  "name": "Gemini Live Voice Context",
+  "description": "Real-time voice conversation with Gemini 2.5 Live API, featuring customizable knowledge base context.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
