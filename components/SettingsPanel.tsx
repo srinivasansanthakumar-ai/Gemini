@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
-import { Settings, FileText, Upload, Info, Loader2, CheckCircle } from 'lucide-react';
+import { FileText, Upload, Loader2, CheckCircle, File, Type } from 'lucide-react';
 import { LiveConfig } from '../types';
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
-
-// Initialize PDF.js worker
-GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs`;
 
 interface SettingsPanelProps {
   config: LiveConfig;
@@ -15,7 +11,6 @@ interface SettingsPanelProps {
 const VOICES = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabled }) => {
-  const [isOpen, setIsOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
 
@@ -28,9 +23,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
 
     try {
       if (file.type === 'application/pdf') {
+        // Dynamic import to prevent app crash on initial load
+        const pdfjs = await import('pdfjs-dist');
+        
+        // Configure worker
+        if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+            pdfjs.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@4.2.67/build/pdf.worker.min.mjs`;
+        }
+
         const arrayBuffer = await file.arrayBuffer();
-        // Use the named export getDocument
-        const loadingTask = getDocument({ data: arrayBuffer });
+        const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
         const pdf = await loadingTask.promise;
         
         let fullText = '';
@@ -45,7 +47,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
 
         setConfig(prev => ({
           ...prev,
-          systemInstruction: prev.systemInstruction + `\n\n=== PDF Context: ${file.name} ===\n${fullText}`
+          systemInstruction: prev.systemInstruction + `\n\n=== Knowledge Base (PDF): ${file.name} ===\n${fullText}`
         }));
 
       } else {
@@ -56,7 +58,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
           if (text) {
             setConfig(prev => ({
               ...prev,
-              systemInstruction: prev.systemInstruction + `\n\n=== File Context: ${file.name} ===\n${text}`
+              systemInstruction: prev.systemInstruction + `\n\n=== Knowledge Base (File): ${file.name} ===\n${text}`
             }));
           }
         };
@@ -68,135 +70,106 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, setConfig, disabl
       setFileName(null);
     } finally {
       setIsProcessing(false);
-      // Reset input value to allow re-uploading the same file if needed
       e.target.value = '';
     }
   };
 
-  if (!isOpen) {
-    return (
-      <button 
-        onClick={() => setIsOpen(true)}
-        className="absolute top-6 right-6 p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full transition-all shadow-lg border border-slate-700 z-50"
-        title="Settings"
-      >
-        <Settings size={20} />
-      </button>
-    );
-  }
-
   return (
-    <div className="absolute top-0 right-0 h-full w-full md:w-96 bg-slate-900/95 backdrop-blur-md border-l border-slate-700 p-6 shadow-2xl z-50 overflow-y-auto transition-transform">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-xl font-display font-bold text-white flex items-center gap-2">
-          <Settings size={20} className="text-indigo-400" />
-          Configuration
-        </h2>
-        <button 
-          onClick={() => setIsOpen(false)}
-          className="text-slate-400 hover:text-white p-2"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Voice Selection */}
-      <div className="mb-8">
-        <label className="block text-sm font-medium text-slate-400 mb-3 uppercase tracking-wider">Voice Persona</label>
-        <div className="grid grid-cols-2 gap-3">
-          {VOICES.map(voice => (
-            <button
-              key={voice}
-              onClick={() => setConfig({ ...config, voiceName: voice })}
-              disabled={disabled}
-              className={`p-3 rounded-xl border text-sm font-semibold transition-all ${
-                config.voiceName === voice
-                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'
-              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {voice}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Knowledge Base */}
-      <div className="mb-8">
-        <label className="block text-sm font-medium text-slate-400 mb-3 uppercase tracking-wider flex justify-between items-center">
-          <span>Knowledge Base</span>
-          <div className="relative group">
-             <Info size={14} className="text-slate-500 cursor-help"/>
-             <div className="absolute right-0 w-48 p-2 bg-slate-800 text-xs text-slate-300 rounded shadow-xl hidden group-hover:block border border-slate-700 -mt-8 mr-6">
-                Uploaded content is appended to the System Instruction.
-             </div>
-          </div>
+    <div className="p-6 space-y-8">
+      {/* File Upload Section */}
+      <section>
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3 uppercase tracking-wider">
+           <File size={16} className="text-indigo-400" />
+           Document Source
         </label>
         
-        <div className={`rounded-xl p-4 border mb-4 transition-colors ${fileName ? 'bg-indigo-900/20 border-indigo-500/50' : 'bg-slate-800 border-slate-700'}`}>
-          <div className="flex items-center gap-3 mb-3">
-            <div className={`p-2 rounded-lg ${fileName ? 'bg-indigo-500 text-white' : 'bg-indigo-500/10 text-indigo-400'}`}>
-               <FileText size={20} />
-            </div>
-            <div className="overflow-hidden">
-              <h3 className="text-sm font-medium text-white truncate">
-                {fileName || "Drive / Local File"}
-              </h3>
-              <p className="text-xs text-slate-400 truncate">
-                {fileName ? "Context loaded successfully" : "Upload PDF to ground the AI"}
-              </p>
-            </div>
-            {fileName && <CheckCircle size={16} className="text-emerald-400 ml-auto flex-shrink-0" />}
-          </div>
+        <div className={`
+            relative group rounded-xl border-2 border-dashed transition-all duration-200
+            ${fileName 
+                ? 'border-indigo-500/50 bg-indigo-500/5' 
+                : 'border-slate-700 hover:border-indigo-400/50 hover:bg-slate-800/50'}
+            ${disabled || isProcessing ? 'opacity-50 cursor-not-allowed' : ''}
+        `}>
+          <input 
+            type="file" 
+            accept=".txt,.md,.json,.csv,.pdf"
+            onChange={handleFileUpload}
+            disabled={disabled || isProcessing}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+          />
           
-          <div className="relative">
-             <input 
-               type="file" 
-               accept=".txt,.md,.json,.csv,.pdf"
-               onChange={handleFileUpload}
-               disabled={disabled || isProcessing}
-               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-10"
-             />
-             <button 
-                disabled={disabled || isProcessing} 
-                className={`w-full py-2 border-2 border-dashed rounded-lg flex items-center justify-center gap-2 text-sm transition-colors ${
-                  fileName 
-                    ? 'border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10' 
-                    : 'border-slate-600 text-slate-400 hover:text-indigo-400 hover:border-indigo-400'
-                } ${disabled || isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-             >
-               {isProcessing ? (
-                 <>
-                   <Loader2 size={16} className="animate-spin" />
-                   <span>Processing...</span>
-                 </>
-               ) : (
-                 <>
-                   <Upload size={16} />
-                   <span>{fileName ? "Replace File" : "Upload PDF Document"}</span>
-                 </>
-               )}
-             </button>
+          <div className="p-6 flex flex-col items-center justify-center text-center gap-3">
+            {isProcessing ? (
+               <Loader2 size={32} className="text-indigo-400 animate-spin" />
+            ) : fileName ? (
+               <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <CheckCircle size={24} />
+               </div>
+            ) : (
+               <div className="w-12 h-12 rounded-full bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-indigo-400 transition-colors flex items-center justify-center">
+                  <Upload size={20} />
+               </div>
+            )}
+            
+            <div>
+              <p className="font-medium text-slate-200">
+                {isProcessing ? "Processing Document..." : fileName || "Drop PDF or Text file here"}
+              </p>
+              {!fileName && !isProcessing && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Supports PDF, TXT, MD, JSON
+                </p>
+              )}
+            </div>
           </div>
         </div>
+      </section>
 
+      {/* System Instruction Editor */}
+      <section>
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3 uppercase tracking-wider">
+           <Type size={16} className="text-indigo-400" />
+           System Context
+        </label>
         <div className="relative">
           <textarea
             value={config.systemInstruction}
             onChange={(e) => setConfig({ ...config, systemInstruction: e.target.value })}
             disabled={disabled}
-            placeholder="System instructions..."
-            className="w-full h-48 bg-slate-800 border border-slate-700 rounded-xl p-4 text-sm text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none font-mono leading-relaxed"
+            placeholder="Enter system instructions or upload a file above..."
+            className="w-full h-64 bg-slate-950/50 border border-slate-700 rounded-xl p-4 text-sm text-slate-300 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all outline-none resize-none font-mono leading-relaxed custom-scrollbar"
           />
-          <div className="absolute bottom-2 right-2 text-xs text-slate-500 pointer-events-none">
+          <div className="absolute bottom-3 right-3 text-xs font-mono text-slate-600 bg-slate-900/80 px-2 py-1 rounded">
             {config.systemInstruction.length} chars
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-xs text-yellow-200/80 leading-relaxed">
-        <strong>Note:</strong> Restart the conversation to apply new voice or knowledge base settings.
-      </div>
+      {/* Voice Selection */}
+      <section>
+        <label className="block text-sm font-medium text-slate-300 mb-3 uppercase tracking-wider">
+            Voice Persona
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {VOICES.map(voice => (
+            <button
+              key={voice}
+              onClick={() => setConfig({ ...config, voiceName: voice })}
+              disabled={disabled}
+              className={`
+                px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 border
+                ${config.voiceName === voice
+                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750 hover:border-slate-600'
+                } 
+                ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+              `}
+            >
+              {voice}
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 };

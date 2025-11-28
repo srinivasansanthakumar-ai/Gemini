@@ -3,7 +3,8 @@ import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { createAudioContentBlob, decodeAudioData, decodeBase64ToUint8Array } from '../utils/audio-utils';
 import { ConnectionState, LiveConfig, VolumeLevel } from '../types';
 
-const API_KEY = process.env.API_KEY || '';
+// Robustly get API Key from process.env or window.process.env
+const API_KEY = (process.env.API_KEY as string) || ((window as any).process?.env?.API_KEY as string) || '';
 const MODEL_NAME = 'gemini-2.5-flash-native-audio-preview-09-2025';
 
 export const useLiveApi = (config: LiveConfig) => {
